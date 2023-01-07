@@ -12,7 +12,7 @@ const Login = ({ setIsAuth }) => {
     const data = { username, password };
     setLoading(true);
     const res = await axios
-      .post("http://localhost:8000/api/auth/admin", data)
+      .post("https://qualido-backend.onrender.com/api/auth/admin", data)
       .catch((e) => setError(true));
 
     if (res) setLoading(false);

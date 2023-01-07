@@ -37,7 +37,9 @@ const AddProd = ({ details, setDetails }) => {
   ]);
 
   const getCategories = async () => {
-    const res = await axios.get("http://localhost:8000/api/categories");
+    const res = await axios.get(
+      "https://qualido-backend.onrender.com/api/categories"
+    );
 
     const catArray = res.data.categories.map((cat) => cat.name);
 
@@ -154,7 +156,7 @@ const AddProd = ({ details, setDetails }) => {
 
       console.log(body);
       const res = await axios
-        .post("http://localhost:8000/api/products/add", body)
+        .post("https://qualido-backend.onrender.com/api/products/add", body)
         .catch((error) => {
           if (error.response) {
             // The request was made and the server responded with a status code
