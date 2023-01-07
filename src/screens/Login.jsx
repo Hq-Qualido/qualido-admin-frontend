@@ -12,12 +12,13 @@ const Login = ({ setIsAuth }) => {
     const data = { username, password };
     setLoading(true);
     const res = await axios
-      .post("https://qualido-server-16td.onrender.com/api/auth/admin", data)
+      .post("http://localhost:8000/api/auth/admin", data)
       .catch((e) => setError(true));
 
     if (res) setLoading(false);
 
     if (!loading && res.data.code === "AUTH_TRUE") {
+      localStorage.setItem("admin_qualido_token", true);
       setIsAuth(true);
     } else setError(true);
   };

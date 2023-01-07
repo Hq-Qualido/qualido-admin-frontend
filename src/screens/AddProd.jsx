@@ -1,38 +1,33 @@
 import axios from "axios";
 import React, { useEffect, useRef, useState } from "react";
+import fs from "fs";
+
 import Dropdown from "../components/DropDown";
+import { TextInput } from "../components/TextInput";
 
-const TextInput = ({ title, type, setInput, value }) => {
-  return (
-    <div className="w-full mb-3">
-      <h3>{title}</h3>
-      <input
-        type={type ? type : "text"}
-        className="w-full bg-teal-100 text-green-800 p-2 outline-none rounded"
-        onChange={(e) => setInput(e.target.value)}
-        value={value}
-      />
-    </div>
-  );
-};
+const AddProd = ({ details, setDetails }) => {
+  const { title, bookDescription, price, numberOfPages } = details;
 
-const AddProd = () => {
   const [image, setImage] = useState();
-  const [imageUrl, setImageUrl] = useState();
+  const [imageUrls, setImageUrls] = useState(details.imgUrls);
+  const [uploadedImgUrls, setUploadedImgUrls] = useState([]);
   const [uploading, setUploading] = useState(false);
-  const [prodName, setProdName] = useState();
-  const [authorName, setAuthorName] = useState();
-  const [aboutAuthor, setAboutAuthor] = useState();
-  const [description, setDescription] = useState();
-  const [prodMrp, setprodMrp] = useState();
+  const [uploadCount, setUploadCount] = useState(0);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [prodName, setProdName] = useState(title);
+  const [authorName, setAuthorName] = useState(details.authorName);
+  const [aboutAuthor, setAboutAuthor] = useState(details.aboutAuthor);
+  const [description, setDescription] = useState(bookDescription);
+  const [prodMrp, setprodMrp] = useState(price);
   const [prodSp, setprodSp] = useState();
-  const [weight, setWeight] = useState();
-  const [height, setHeight] = useState();
-  const [length, setLength] = useState();
-  const [width, setWidth] = useState();
-  const [publisher, setPublisher] = useState();
-  const [numOfPages, setNumOfPages] = useState();
-  const [language, setLanguage] = useState();
+  const [weight, setWeight] = useState(details.weight);
+  // const [height, setHeight] = useState();
+  // const [length, setLength] = useState();
+  // const [width, setWidth] = useState();
+  const [dimensions, setDimensions] = useState(details.dimensions);
+  const [publisher, setPublisher] = useState(details.publisher);
+  const [numOfPages, setNumOfPages] = useState(numberOfPages);
+  const [language, setLanguage] = useState(details.language);
   const [category, setCategory] = useState();
   const [categoriesArray, setCategoriesArray] = useState([]);
   const [bookType, setBookType] = useState();
@@ -42,9 +37,7 @@ const AddProd = () => {
   ]);
 
   const getCategories = async () => {
-    const res = await axios.get(
-      "https://qualido-server-16td.onrender.com/api/categories"
-    );
+    const res = await axios.get("http://localhost:8000/api/categories");
 
     const catArray = res.data.categories.map((cat) => cat.name);
 
@@ -55,18 +48,17 @@ const AddProd = () => {
 
   const clearFields = () => {
     setImage();
+    setUploadCount();
     setAboutAuthor("");
     setAuthorName("");
     setCategory("");
     setDescription("");
-    setHeight("");
-    setLength("");
+    setDimensions("");
     setWeight("");
-    setWidth("");
     setProdName("");
     setprodMrp("");
     setprodSp("");
-    setImageUrl("");
+    setImageUrls("");
     setBookType("");
     setNumOfPages("");
     setPublisher("");
@@ -77,13 +69,46 @@ const AddProd = () => {
     getCategories();
   }, []);
 
-  const submitHandler = async () => {
+  const uploadImages = async ({ imageUrl, index }) => {
+    const response = await axios.get(imageUrl, {
+      responseType: "arraybuffer",
+    });
+    const reader = new FileReader();
+    reader.readAsDataURL(new Blob([response.data]));
+
+    const result = await new Promise((resolve) => {
+      reader.onloadend = () => {
+        resolve(reader.result);
+      };
+    });
+
+    // The result is a base64-encoded data URL
+    const base64Data = result;
+    console.log(`Image ${index} downloaded and saved to a local file`);
+
     const formData = new FormData();
-    formData.append("file", image);
+    formData.append("file", base64Data);
     formData.append("upload_preset", "rik1sh9y");
 
+    const imgRes = await axios.post(
+      "https://api.cloudinary.com/v1_1/dkpwfe15i/image/upload",
+      formData
+    );
+
+    const url = imgRes.data.url;
+
+    URL.revokeObjectURL(base64Data);
+
+    return url;
+  };
+
+  useEffect(() => {
+    setUploadProgress((uploadedImgUrls.length / imageUrls.length) * 100);
+  }, [uploadCount]);
+
+  const submitHandler = async () => {
     if (
-      !image ||
+      !imageUrls ||
       !prodName ||
       !prodMrp ||
       !prodSp ||
@@ -91,9 +116,7 @@ const AddProd = () => {
       !aboutAuthor ||
       !description ||
       !category ||
-      !length ||
-      !height ||
-      !width ||
+      !dimensions ||
       !publisher ||
       !numOfPages ||
       !bookType ||
@@ -103,54 +126,75 @@ const AddProd = () => {
 
     setUploading(true);
 
-    const imgRes = await axios.post(
-      "https://api.cloudinary.com/v1_1/dkpwfe15i/image/upload",
-      formData
-    );
+    (async () => {
+      for (let i = 0; i < imageUrls.length; i++) {
+        const imageUrl = imageUrls[i];
+        setUploadCount(i + 1);
+        const uploadedUrl = await uploadImages({ imageUrl, index: i });
+        uploadedImgUrls.push(uploadedUrl);
+      }
+      console.log("All images uploaded");
+      setUploadProgress(100);
 
-    const url = imgRes.data.url;
-    console.log(url);
-    const body = {
-      prodName,
-      authorName,
-      aboutAuthor,
-      url,
-      description,
-      prodMrp,
-      prodSp,
-      category,
-      length,
-      height,
-      width,
-      publisher,
-      numOfPages,
-      bookType,
-      language,
-    };
-    const res = await axios.post(
-      "https://qualido-server-16td.onrender.com/api/products/add",
-      body
-    );
+      const body = {
+        prodName,
+        authorName,
+        aboutAuthor,
+        urls: uploadedImgUrls,
+        description,
+        prodMrp,
+        prodSp,
+        category,
+        dimensions,
+        publisher,
+        numOfPages,
+        bookType,
+        language,
+      };
 
-    setUploading(false);
+      console.log(body);
+      const res = await axios
+        .post("http://localhost:8000/api/products/add", body)
+        .catch((error) => {
+          if (error.response) {
+            // The request was made and the server responded with a status code
+            // that falls out of the range of 2xx
+            console.log(error.response.data);
+            console.log(error.response.status);
+            console.log(error.response.headers);
+          } else if (error.request) {
+            // The request was made but no response was received
+            // `error.request` is an instance of XMLHttpRequest in the browser and an instance of
+            // http.ClientRequest in node.js
+            console.log(error.request);
+          } else {
+            // Something happened in setting up the request that triggered an Error
+            console.log("Error", error.message);
+          }
+        });
 
-    if (res.statusText === "OK") {
-      clearFields();
-      clearFileInput();
-      return alert("Product added successfully.");
-    } else return alert(res.data.error);
-    // setImgRes(imgRes);
+      setTimeout(() => {
+        setUploading(false);
+        if (res.statusText === "OK") {
+          setUploadProgress(0);
+          clearFields();
+          clearFileInput();
+          // alert("Product added successfully.");
+          return setDetails();
+        } else return alert(res.data.error);
+      }, 2000);
+    })();
   };
 
   const fileInput = useRef(null);
 
   const clearFileInput = () => {
     fileInput.current.value = "";
-    setImageUrl();
+    setImageUrls();
   };
 
   return (
-    <div className="flex flex-col justify-center items-center border border-cyan-700 text-white bg-[#175b6e] font-body p-5 rounded  ">
+    <div className="flex flex-col justify-center items-center border w-[75%] border-cyan-700 text-white bg-[#175b6e] font-body p-5 rounded  ">
       <h2 className="text-3xl font-medium self-start mb-5">ADD BOOK</h2>
       <div className=" m-0 p-0 w-full ">
         <div className="sm:flex justify-between space-x-8">
@@ -187,74 +231,60 @@ const AddProd = () => {
         <div className="flex justify-between space-x-8">
           <TextInput
             title="Product MRP"
-            type={"number"}
+            // type={"number"}
             setInput={setprodMrp}
             value={prodMrp}
           />
           <TextInput
             title="Product SP"
-            type={"number"}
+            // type={"number"}
             setInput={setprodSp}
             value={prodSp}
           />
-          <TextInput //paperback or hardcover
+          <TextInput
             title="Weight(in kg)"
-            type={"number"}
+            // type={"number"}
             setInput={setWeight}
             value={weight}
           />
         </div>
 
-        <div className="flex justify-between space-x-8">
-          <TextInput
-            title="Height(in cm)"
-            type={"number"}
-            setInput={setHeight}
-            value={height}
-          />
-          <TextInput
-            title="Width(in cm)"
-            type={"number"}
-            setInput={setWidth}
-            value={width}
-          />
-          <TextInput
-            title="Length(in cm)"
-            type={"number"}
-            setInput={setLength}
-            value={length}
-          />
-        </div>
         <div className="sm:flex sm:space-x-8">
           <TextInput
             title="Publisher"
             setInput={setPublisher}
             value={publisher}
           />
-          <div className="flex sm:flex-none sm:w-1/2">
-            <div className="w-full">
-              <h3>Select Book Type</h3>
-              <Dropdown setOption={setBookType} array={bookTypeArray} />
-            </div>
-            <TextInput
-              title="No. of Pages"
-              type={"number"}
-              setInput={setNumOfPages}
-              value={numOfPages}
-            />
-          </div>
-        </div>
-
-        <div className="flex justify-between w-full space-x-8">
-          <div>
-            <h3>Select Category</h3>
-            <Dropdown setOption={setCategory} array={categoriesArray} />
-          </div>
           <TextInput
             title="Enter Language(first letter capital)"
             setInput={setLanguage}
             value={language}
           />
+          {/* <div className="flex sm:flex-none sm:w-1/2"> */}
+          <TextInput
+            title="No. of Pages"
+            // type={"number"}
+            setInput={setNumOfPages}
+            value={numOfPages}
+          />
+          {/* </div> */}
+        </div>
+
+        <div className="flex justify-between w-full space-x-8">
+          <TextInput
+            title="Enter Dimensions"
+            setInput={setDimensions}
+            value={dimensions}
+          />
+          <div>
+            <h3>Select Category</h3>
+            <Dropdown setOption={setCategory} array={categoriesArray} />
+          </div>
+          <div className="w-full">
+            <h3>Select Book Type</h3>
+            <Dropdown setOption={setBookType} array={bookTypeArray} />
+          </div>
+
           <div className="w-[15rem]">
             <h3>Add Images</h3>
             <input
@@ -262,7 +292,10 @@ const AddProd = () => {
               ref={fileInput}
               onChange={(e) => {
                 setImage(e.target.files[0]);
-                setImageUrl(URL.createObjectURL(e.target.files[0]));
+                setImageUrls([
+                  ...imageUrls,
+                  URL.createObjectURL(e.target.files[0]),
+                ]);
               }}
             />
             <button type="button" onClick={clearFileInput}>
@@ -270,8 +303,23 @@ const AddProd = () => {
             </button>
           </div>
         </div>
-        <img src={imageUrl} alt="" />
+        <div className="flex flex-wrap space-x-5 space-y-5 justify-center items-center">
+          {imageUrls.map((url) => (
+            <img src={url} alt="" className="w-56" />
+          ))}
+        </div>
       </div>
+      {uploading && (
+        <>
+          <div className="w-full bg-[#083440] my-5 rounded-full">
+            <div
+              className={`py-1 w-full bg-cyan-400 rounded-full duration-200`}
+              style={{ width: `${uploadProgress}%` }}
+            ></div>
+          </div>
+          <div>{uploadProgress === 100 ? "Uploaded" : "Uploading..."}</div>
+        </>
+      )}
       <button
         className={`  w-full my-5 rounded py-3 font-body text-lg ${
           uploading
